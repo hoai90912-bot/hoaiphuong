@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cổng Thông Tin Tín Chỉ VLUTE (Giả lập)</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+
+    <style>
+        :root {
+            --primary: #0056b3; 
+            --primary-dark: #004494;
+            --secondary: #6c757d;
+            --success: #28a745; 
+            --warning: #ffc107; 
+            --danger: #dc3545;
+            --light: #f8f9fa;
+            --dark: #343a40;
+            --border-radius: 8px;
+            --shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
+        * { box-sizing: border-box; }
+        body {
+            font-family: 'Inter', sans-serif; background: #eaecf4; color: #5a5c69;
+            margin: 0; padding: 0; font-size: 14px;
+        }
+
+        /* --- WATERMARK --- */
+        body::before {
+            content: "CỘNG ĐỒNG VLUTE KẾT NỐI - GIAO LƯU & CHIA SẺ";
+            position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%) rotate(-30deg);
+            font-size: 3vw; color: rgba(0, 86, 179, 0.05); pointer-events: none;
+            font-weight: 900; z-index: 0; white-space: nowrap;
+        }
+
+        /* --- LAYOUT --- */
+        .wrapper { display: flex; flex-direction: column; min-height: 100vh; position: relative; z-index: 1; }
+        
+        /* HEADER STYLE PORTAL */
+        .top-bar {
+            background: var(--primary); color: white; padding: 15px 20px;
+            display: flex; justify-content: space-between; align-items: center;
+            box-shadow: var(--shadow);
+        }
+        .brand { font-size: 1.2rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; display: flex; align-items: center; gap: 10px; }
+        .disclaimer-badge {
+            background: #ffc107; color: #333; padding: 5px 10px; border-radius: 20px;
+            font-size: 0.8rem; font-weight: bold; display: flex; align-items: center; gap: 5px;
+        }
+
+        /* MAIN CONTENT */
+        .container {
+            max-width: 1200px; margin: 20px auto; padding: 0 15px;
+            display: grid; grid-template-columns: 350px 1fr; gap: 20px;
+        }
+
+        /* LEFT SIDEBAR (INPUT) */
+        .sidebar .card { position: sticky; top: 20px; }
+
+        /* CARDS */
+        .card { background: white; border-radius: var(--border-radius); box-shadow: var(--shadow); overflow: hidden; margin-bottom: 20px; border: 1px solid #e3e6f0; }
+        .card-header {
+            padding: 15px 20px; background: #f8f9fc; border-bottom: 1px solid #e3e6f0;
+            font-weight: 700; color: var(--primary); display: flex; justify-content: space-between; align-items: center;
+        }
+        .card-body { padding: 20px; }
+
+        /* FORM ELEMENTS */
+        .form-group { margin-bottom: 15px; }
+        label { display: block; font-weight: 600; margin-bottom: 5px; color: #4e73df; font-size: 0.85rem; }
+        input, select {
+            width: 100%; padding: 10px; border: 1px solid #d1d3e2; border-radius: 5px;
+            font-size: 0.9rem; transition: 0.2s;
+        }
+        input:focus { border-color: var(--primary); outline: none; box-shadow: 0 0 0 3px rgba(0,86,179,0.1); }
+
+        .btn {
+            display: inline-flex; align-items: center; justify-content: center; gap: 5px;
+            padding: 8px 12px; border: none; border-radius: 5px; cursor: pointer;
+            font-weight: 600; font-size: 0.9rem; transition: 0.2s; width: 100%;
+        }
+        .btn-primary { background: var(--primary); color: white; padding: 12px; font-size: 1rem; }
+        .btn-primary:hover { background: var(--primary-dark); }
+        .btn-tool { width: auto; font-size: 0.8rem; padding: 6px 10px; }
+        .btn-excel { background: var(--success); color: white; }
+        .btn-pdf { background: var(--danger); color: white; }
+        .btn-upload { background: #17a2b8; color: white; }
+        .btn-reset { background: #6c757d; color: white; }
+
+        /* QT GRID */
+        #qtContainer { background: #f0f8ff; padding: 10px; border-radius: 5px; border: 1px dashed #b8daff; margin-bottom: 10px; }
+        .qt-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; }
+        .qt-inp { text-align: center; }
+
+        /* DATA TABLES (STYLE CỔNG THÔNG TIN) */
+        .semester-section { margin-bottom: 25px; }
+        .sem-title {
+            background: #4e73df; color: white; padding: 10px 15px;
+            border-radius: 5px 5px 0 0; font-weight: bold;
+            display: flex; justify-content: space-between;
+        }
+        .data-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+        .data-table th { background: #f8f9fc; color: #4e73df; font-weight: 700; padding: 10px; text-align: center; border: 1px solid #e3e6f0; }
+        .data-table td { padding: 10px; border: 1px solid #e3e6f0; text-align: center; color: #5a5c69; }
+        .data-table tr:hover { background: #fafafa; }
+        
+        /* ĐIỂM SỐ MÀU SẮC */
+        .badge { padding: 4px 8px; border-radius: 4px; color: white; font-weight: bold; font-size: 0.8rem; }
+        
+        /* SUMMARY TABLE EDITABLE */
+        .editable { 
+            cursor: pointer; border-bottom: 1px dashed #aaa; transition: 0.2s;
+            background: #fff3cd; color: #856404; font-weight: bold; padding: 2px 5px;
+        }
+        .editable:hover { background: #ffeeba; }
+        .editable:focus { outline: 2px solid var(--primary); background: white; }
+
+        /* LOADING */
+        #loading {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(255,255,255,0.9); z-index: 9999; display: none;
+            justify-content: center; align-items: center; flex-direction: column;
+        }
+        .spinner { width: 40px; height: 40px; border: 4px solid #f3f3f3; border-top: 4px solid var(--primary); border-radius: 50%; animation: spin 1s linear infinite; }
+        @keyframes spin { 100% { transform: rotate(360deg); } }
+
+        /* FOOTER */
+        footer { background: white; padding: 20px; text-align: center; border-top: 1px solid #e3e6f0; margin-top: auto; font-size: 0.85rem; color: #888; }
+
+        /* RESPONSIVE */
+        @media (max-width: 900px) {
+            .container { grid-template-columns: 1fr; }
+            .sidebar .card { position: static; }
+        }
+        @media print {
+            .sidebar, .toolbar, .no-print { display: none !important; }
+            .container { grid-template-columns: 1fr; max-width: 100%; margin: 0; padding: 0; }
+            .card { box-shadow: none; border: none; }
+            body { background: white; }
+        }
+    </style>
+</head>
+<body>
+
+<div id="loading">
+    <div class="spinner"></div>
+    <p style="margin-top: 15px; font-weight: 600; color: var(--primary);">Đang xử lý dữ liệu...</p>
+</div>
+
+<div class="wrapper">
+    <div class="top-bar">
+        <div class="brand"><i class="fas fa-graduation-cap"></i> HỆ THỐNG TÍNH ĐIỂM HỌC PHẦN</div>
+        <div class="disclaimer-badge">
+            <i class="fas fa-exclamation-triangle"></i> Lưu ý: Kết quả chỉ mang tính tham khảo, không thay thế dữ liệu nhà trường.
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="sidebar">
+            <div class="card">
+                <div class="card-header">
+                    <span><i class="fas fa-edit"></i> Nhập Liệu</span>
+                    <button class="btn btn-reset btn-tool" onclick="resetData()"><i class="fas fa-trash"></i> Xóa hết</button>
+                </div>
+                <div class="card-body">
+                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:5px; margin-bottom:15px;">
+                        <input type="file" id="fileInput" multiple style="display:none" onchange="handleFiles(this.files)">
+                        <button class="btn btn-upload" onclick="document.getElementById('fileInput').click()">
+                            <i class="fas fa-file-upload"></i> Nhập File
+                        </button>
+                        <div style="display:flex; gap:5px">
+                            <button class="btn btn-excel btn-tool" onclick="exportToExcel()"><i class="fas fa-file-excel"></i></button>
+                            <button class="btn btn-pdf btn-tool" onclick="exportToPDF()"><i class="fas fa-file-pdf"></i></button>
+                            <button class="btn btn-tool" style="background:#555;color:white" onclick="window.print()"><i class="fas fa-print"></i></button>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Tên Học kỳ (VD: HK1 Năm 2025)</label>
+                        <input type="text" id="semester" list="semList" value="Học kỳ 1">
+                        <datalist id="semList">
+                            <option value="Học kỳ 1 Năm 1"><option value="Học kỳ 2 Năm 1">
+                            <option value="Học kỳ Hè"><option value="Học kỳ Cải thiện">
+                        </datalist>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Tên Môn Học</label>
+                        <input type="text" id="subName" placeholder="VD: Luật kinh tế">
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                        <div class="form-group">
+                            <label>Số Tín Chỉ</label>
+                            <input type="number" id="subCredit" value="3" min="1" oninput="renderQT()">
+                        </div>
+                        <div class="form-group">
+                            <label>Chuyên Cần (10%)</label>
+                            <input type="number" id="cc" step="0.1" placeholder="Trống nếu nhập tắt">
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Điểm Thi (70%) / Hoặc ĐTB Tổng (10)</label>
+                        <input type="number" id="ex" step="0.1" placeholder="Nhập điểm thi hoặc ĐTB 10">
+                    </div>
+
+                    <div id="qtContainer">
+                        <label style="font-size:0.8rem; margin-bottom:5px;">Điểm Quá trình (20%):</label>
+                        <div class="qt-grid" id="qtArea"></div>
+                    </div>
+
+                    <div class="form-group" style="border-top:1px dashed #ccc; padding-top:10px; margin-top:10px">
+                        <label style="color:var(--warning)">Hoặc nhập GPA Hệ 4 (Nhập tắt):</label>
+                        <input type="number" id="gpa4_quick" step="0.1" placeholder="Nếu đã có hệ 4 thì nhập vào đây">
+                    </div>
+
+                    <div style="font-size: 0.8rem; color: #666; background: #fff3cd; padding: 8px; border-radius: 4px; margin-bottom: 10px;">
+                        <i class="fas fa-lightbulb"></i> <b>Mẹo nhập tắt:</b> Chỉ cần nhập <b>[Tín chỉ]</b> + <b>[Ô Điểm Thi]</b> (là ĐTB 10) hoặc <b>[Ô Hệ 4]</b>. Bỏ qua các ô khác.
+                    </div>
+
+                    <button class="btn btn-primary" onclick="addSubject()">
+                        <i class="fas fa-plus-circle"></i> Thêm Môn Học
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="main-content" id="printableArea">
+            
+            <div class="card">
+                <div class="card-header">
+                    <span><i class="fas fa-list"></i> Bảng Điểm Chi Tiết</span>
+                </div>
+                <div class="card-body" id="subjectListArea">
+                    <div style="text-align:center; color:#ccc; padding:20px;">Chưa có dữ liệu môn học</div>
+                </div>
+            </div>
+
+            <div class="card" id="summarySection" style="display:none; border-top: 4px solid var(--success);">
+                <div class="card-header" style="background: #e8f5e9; color: var(--success);">
+                    <span><i class="fas fa-chart-line"></i> BẢNG TỔNG KẾT KẾT QUẢ HỌC TẬP</span>
+                </div>
+                <div class="card-body">
+                    <p style="font-size:0.85rem; color:#666; font-style:italic; margin-bottom:10px;">
+                        * Click vào tên học kỳ để đổi tên.<br>
+                        * Điểm F tính vào ĐTB học kỳ nhưng <b>KHÔNG</b> tính vào tích lũy toàn khóa.
+                    </p>
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th style="text-align:left">Học Kỳ</th>
+                                <th>TC Đăng ký</th>
+                                <th>TC Tích lũy</th>
+                                <th>ĐTB (Hệ 10)</th>
+                                <th>GPA (Hệ 4)</th>
+                                <th>Xếp Loại</th>
+                            </tr>
+                        </thead>
+                        <tbody id="summaryBody"></tbody>
+                    </table>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <footer>
+        <div style="font-weight:bold; margin-bottom:5px;">HỆ THỐNG TÍNH ĐIỂM HỌC PHẦN TỰ ĐỘNG</div>
+        <div>© 2026 CỘNG ĐỒNG VLUTE KẾT NỐI - GIAO LƯU & CHIA SẺ</div>
+        <div style="margin-top:5px; font-size:0.75rem;">Công cụ hỗ trợ sinh viên - Quy định hiện hành ĐH SPKT Vĩnh Long</div>
+    </footer>
+</div>
+
+<script>
+    let subjects = [];
+
+    document.addEventListener("DOMContentLoaded", () => {
+        renderQT();
+        loadData();
+    });
+
+    // --- DATA MANAGEMENT ---
+    function saveData() { localStorage.setItem('vlute_portal_v13', JSON.stringify(subjects)); }
+    function loadData() {
+        const data = localStorage.getItem('vlute_portal_v13');
+        if (data) { subjects = JSON.parse(data); renderAll(); }
+    }
+    function resetData() {
+        if(confirm("Bạn có chắc chắn muốn xóa toàn bộ dữ liệu và nhập lại từ đầu?")) {
+            subjects = []; saveData(); renderAll();
+        }
+    }
+
+    // --- RENDER UI ---
+    function renderQT() {
+        let n = parseInt(document.getElementById('subCredit').value) || 0;
+        let area = document.getElementById('qtArea');
+        area.innerHTML = "";
+        if(n < 1) return;
+        for(let i=1; i<=n; i++) area.innerHTML += `<input type="number" class="qt-inp" placeholder="QT${i}" step="0.1" style="font-size:0.8rem">`;
+    }
+
+    // --- CORE LOGIC: ADD SUBJECT ---
+    function addSubject() {
+        let semester = document.getElementById('semester').value.trim() || "Học kỳ Khác";
+        let name = document.getElementById('subName').value || "Môn học";
+        let cred = parseInt(document.getElementById('subCredit').value);
+        let cc = document.getElementById('cc').value; 
+        let ex = document.getElementById('ex').value;
+        let gpa4_quick = document.getElementById('gpa4_quick').value;
+
+        // Lấy điểm QT
+        let qts = [];
+        let hasQT = false;
+        document.querySelectorAll('.qt-inp').forEach(inp => { 
+            if(inp.value !== "") { qts.push(parseFloat(inp.value)); hasQT = true; }
+        });
+
+        let dtb10 = 0, gpa4 = 0, letter = "F";
+
+        // 1. Nhập tắt GPA 4
+        if (gpa4_quick !== "") {
+            gpa4 = parseFloat(gpa4_quick);
+            // Quy đổi ngược ước lượng ra hệ 10 để tính toán
+            if(gpa4>=4) dtb10=9.0; else if(gpa4>=3.5) dtb10=8.2; else if(gpa4>=3.0) dtb10=7.5;
+            else if(gpa4>=2.5) dtb10=6.7; else if(gpa4>=2.0) dtb10=6.0; else if(gpa4>=1.5) dtb10=5.2;
+            else if(gpa4>=1.0) dtb10=4.5; else dtb10=0;
+            let res = convertScore(dtb10); 
+            letter = res.letter; // Lấy letter chuẩn
+            // Fix letter nếu GPA4 nhập tay khác chuẩn
+            if(gpa4>=4) letter="A"; else if(gpa4>=3.5) letter="B+"; else if(gpa4>=3) letter="B";
+            else if(gpa4>=2.5) letter="C+"; else if(gpa4>=2) letter="C"; else if(gpa4>=1.5) letter="D+";
+            else if(gpa4>=1) letter="D"; else letter="F";
+        } 
+        // 2. Nhập tắt ĐTB 10 (vào ô thi)
+        else if (cc === "" && !hasQT && ex !== "") {
+            dtb10 = parseFloat(ex);
+            let res = convertScore(dtb10);
+            gpa4 = res.gpa;
+            letter = res.letter;
+        } 
+        // 3. Tính chi tiết
+        else {
+            let valCC = parseFloat(cc) || 0;
+            let valEx = parseFloat(ex) || 0;
+            while(qts.length < cred) qts.push(0);
+            let sumQt = qts.reduce((a,b)=>a+b, 0);
+            let mau = 1 + (cred * 2) + 3;
+            let tu = (valCC * 1) + (sumQt * 2) + (valEx * 3);
+            dtb10 = tu / mau;
+            let res = convertScore(dtb10);
+            gpa4 = res.gpa;
+            letter = res.letter;
+        }
+
+        subjects.push({ id: Date.now(), semester, name, cred, dtb10, gpa4, letter });
+        saveData(); renderAll();
+        
+        // Reset form (giữ lại tên HK)
+        document.getElementById('subName').value = "";
+        document.getElementById('cc').value = "";
+        document.getElementById('ex').value = "";
+        document.getElementById('gpa4_quick').value = "";
+        renderQT();
+    }
+
+    function convertScore(val) {
+        let l='F', g=0;
+        if(val>=8.5){l='A';g=4.0} else if(val>=8.0){l='B+';g=3.5}
+        else if(val>=7.0){l='B';g=3.0} else if(val>=6.5){l='C+';g=2.5}
+        else if(val>=5.5){l='C';g=2.0} else if(val>=5.0){l='D+';g=1.5}
+        else if(val>=4.0){l='D';g=1.0}
+        return {letter:l, gpa:g};
+    }
+
+    function getRank(gpa) {
+        if(gpa>=3.6) return "Xuất sắc"; if(gpa>=3.2) return "Giỏi";
+        if(gpa>=2.5) return "Khá"; if(gpa>=2.0) return "Trung bình";
+        if(gpa>=1.0) return "Yếu"; return "Kém";
+    }
+    function getRankColor(rank) {
+        if(rank==="Xuất sắc") return "var(--success)"; if(rank==="Giỏi") return "#20c997";
+        if(rank==="Khá") return "var(--primary)"; if(rank==="Trung bình") return "var(--warning)";
+        return "var(--danger)";
+    }
+
+    // --- RENDER MAIN ---
+    function renderAll() {
+        const area = document.getElementById('subjectListArea');
+        area.innerHTML = "";
+        if (subjects.length === 0) {
+            area.innerHTML = `<div style="text-align:center; color:#ccc; padding:20px;">Chưa có dữ liệu môn học</div>`;
+            document.getElementById('summarySection').style.display = 'none';
+            return;
+        }
+
+        document.getElementById('summarySection').style.display = 'block';
+        let groups = {};
+        subjects.forEach(s => { if(!groups[s.semester]) groups[s.semester]=[]; groups[s.semester].push(s); });
+
+        for (const [semName, items] of Object.entries(groups)) {
+            let html = `
+            <div class="semester-section">
+                <div class="sem-title">
+                    <span><i class="fas fa-calendar-alt"></i> ${semName}</span>
+                    <span>${items.length} môn</span>
+                </div>
+                <table class="data-table">
+                    <thead><tr><th>Môn học</th><th>TC</th><th>Hệ 10</th><th>Hệ 4</th><th>Chữ</th><th>Thao tác</th></tr></thead>
+                    <tbody>`;
+            items.forEach(s => {
+                let color = getRankColor(getRank(s.gpa4));
+                html += `<tr>
+                        <td style="text-align:left">${s.name}</td>
+                        <td>${s.cred}</td>
+                        <td><b>${s.dtb10.toFixed(2)}</b></td>
+                        <td style="color:${color}; font-weight:bold">${s.gpa4.toFixed(2)}</td>
+                        <td><span class="badge" style="background:${color}">${s.letter}</span></td>
+                        <td><button style="color:#dc3545; background:none; border:none; cursor:pointer" onclick="deleteSub(${s.id})"><i class="fas fa-trash-alt"></i></button></td>
+                    </tr>`;
+            });
+            html += `</tbody></table></div>`;
+            area.innerHTML += html;
+        }
+        renderSummaryTable(groups);
+    }
+
+    // --- SUMMARY TABLE WITH F LOGIC & RENAMING ---
+    function renderSummaryTable(groups) {
+        const tbody = document.getElementById('summaryBody');
+        tbody.innerHTML = "";
+
+        // Biến toàn khóa (chỉ tính môn Đậu)
+        let totalCred_Acc = 0; // Tích lũy (Bỏ F)
+        let totalSum10_Acc = 0;
+        let totalSum4_Acc = 0;
+
+        for (const [sem, items] of Object.entries(groups)) {
+            // Biến học kỳ (Tính cả F)
+            let semTC = 0; 
+            let semS10 = 0;
+            let semS4 = 0;
+            let semPass = 0;
+
+            items.forEach(s => {
+                // Tính cho học kỳ (Gồm cả F)
+                semTC += s.cred;
+                semS10 += s.dtb10 * s.cred;
+                semS4 += s.gpa4 * s.cred;
+
+                // Tính cho toàn khóa (BỎ F)
+                if (s.letter !== 'F') {
+                    semPass += s.cred;
+                    totalCred_Acc += s.cred;
+                    totalSum10_Acc += s.dtb10 * s.cred;
+                    totalSum4_Acc += s.gpa4 * s.cred;
+                }
+            });
+
+            let avg10 = semTC ? semS10/semTC : 0;
+            let avg4 = semTC ? semS4/semTC : 0;
+            let rank = getRank(avg4);
+
+            tbody.innerHTML += `<tr>
+                <td style="text-align:left">
+                    <span class="editable" contenteditable="true" onblur="renameSemester('${sem}', this.innerText)">${sem}</span>
+                    <i class="fas fa-pen" style="font-size:0.7rem; color:#aaa; margin-left:5px"></i>
+                </td>
+                <td>${semTC}</td>
+                <td>${semPass}</td>
+                <td>${avg10.toFixed(2)}</td>
+                <td>${avg4.toFixed(2)}</td>
+                <td><span class="badge" style="background:${getRankColor(rank)}">${rank}</span></td>
+            </tr>`;
+        }
+
+        // Dòng Tổng kết toàn khóa (Logic: Trừ F ra khỏi mẫu số và tử số)
+        let cpa10 = totalCred_Acc ? totalSum10_Acc/totalCred_Acc : 0;
+        let cpa4 = totalCred_Acc ? totalSum4_Acc/totalCred_Acc : 0;
+        let cpaRank = getRank(cpa4);
+
+        tbody.innerHTML += `<tr style="border-top:2px solid var(--primary); background:#e8f4fd;">
+            <td style="text-align:left; font-weight:bold; color:var(--primary)">TỔNG KẾT TOÀN KHÓA</td>
+            <td>-</td>
+            <td style="font-weight:bold; font-size:1.1rem">${totalCred_Acc}</td>
+            <td style="font-weight:bold">${cpa10.toFixed(2)}</td>
+            <td style="font-weight:bold; color:var(--primary); font-size:1.1rem">${cpa4.toFixed(2)}</td>
+            <td><span class="badge" style="background:${getRankColor(cpaRank)}; font-size:0.9rem">${cpaRank.toUpperCase()}</span></td>
+        </tr>`;
+    }
+
+    // --- CHỨC NĂNG ĐỔI TÊN HỌC KỲ ---
+    function renameSemester(oldName, newName) {
+        newName = newName.trim();
+        if (oldName === newName || newName === "") { renderAll(); return; } // Render lại để reset nếu rỗng
+        
+        subjects.forEach(s => {
+            if (s.semester === oldName) s.semester = newName;
+        });
+        saveData();
+        renderAll();
+    }
+
+    function deleteSub(id) {
+        subjects = subjects.filter(s => s.id !== id);
+        saveData(); renderAll();
+    }
+
+    // --- AI IMPORT ---
+    async function handleFiles(files) {
+        if (!files.length) return;
+        document.getElementById('loading').style.display = 'flex';
+        let sem = document.getElementById('semester').value;
+        for (const f of files) {
+            try {
+                const ext = f.name.split('.').pop().toLowerCase();
+                if (['png','jpg','jpeg'].includes(ext)) {
+                    const worker = await Tesseract.createWorker('vie');
+                    const ret = await worker.recognize(f);
+                    await worker.terminate();
+                    parseText(ret.data.text, sem);
+                } else if (['xlsx','xls'].includes(ext)) {
+                    const d = await f.arrayBuffer();
+                    const wb = XLSX.read(d);
+                    XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1}).forEach(r=>{
+                        if(r.length>=2) addImported(sem, r[0], parseInt(r[1])||2, parseFloat(r[r.length-1])||0);
+                    });
+                } else if (ext === 'docx') {
+                    const res = await mammoth.extractRawText({arrayBuffer: await f.arrayBuffer()});
+                    parseText(res.value, sem);
+                }
+            } catch(e){console.error(e)}
+        }
+        document.getElementById('loading').style.display = 'none';
+        saveData(); renderAll();
+    }
+
+    function parseText(txt, sem) {
+        txt.split('\n').forEach(line => {
+            const nums = line.match(/\d+(\.\d+)?/g)?.map(parseFloat).filter(n=>n<=10)||[];
+            if(nums.length>=2) addImported(sem, line.replace(/[0-9.]/g,'').trim()||"Môn File", Math.floor(nums[0])||3, nums[nums.length-1]);
+        });
+    }
+    function addImported(sem, name, cred, val) {
+        let res = convertScore(val);
+        subjects.push({id:Date.now()+Math.random(), semester:sem, name, cred, dtb10:val, gpa4:res.gpa, letter:res.letter});
+    }
+
+    // --- EXPORT ---
+    function exportToExcel() {
+        if(!subjects.length) return alert("Chưa có dữ liệu!");
+        let data = subjects.map(s => ({"Học kỳ":s.semester,"Môn":s.name,"TC":s.cred,"ĐTB(10)":s.dtb10,"GPA(4)":s.gpa4,"Chữ":s.letter}));
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(data), "BangDiem");
+        XLSX.writeFile(wb, "BangDiem_VLUTE.xlsx");
+    }
+    function exportToPDF() {
+        html2pdf().set({margin:5, filename:'KetQua_VLUTE.pdf', html2canvas:{scale:2}}).from(document.querySelector('.container')).save();
+    }
+</script>
+
+</body>
+</html>
